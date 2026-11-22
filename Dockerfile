@@ -1,6 +1,6 @@
 # Runs the whole stack in one container: Xvfb + Chromium + PulseAudio + FFmpeg.
 # Playwright's image already contains Chromium and its system libraries.
-FROM mcr.microsoft.com/playwright/python:v1.49.1-jammy
+FROM mcr.microsoft.com/playwright/python:v1.65.2-jammy
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends xvfb ffmpeg pulseaudio curl procps \
