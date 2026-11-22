@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VTuber stage</title>
+<style>
+/* Stream this page with PAGE_URL=http://127.0.0.1:8080/vtuber.html (or VTUBER=1 in .env).
+   Options: ?theme=neon|midnight|daylight|terminal   ?mute=1 (no sound)   ?subs=0 (no subtitles)   ?blink=0 (no blinking) */
+:root,[data-theme="midnight"]{--bg:#0a0e1a;--bg2:#1a1740;--fg:#fff;--accent:#ff6fb1;--accent2:#7c5cff;--blob1:#7c5cff;--blob2:#ff6fb1;--blob3:#38bdf8}
+[data-theme="daylight"]{--bg:#fdf3f6;--bg2:#e9e4ff;--fg:#1d1535;--accent:#e0408a;--accent2:#6a4cff;--blob1:#b9a8ff;--blob2:#ffb3d1;--blob3:#a6e3ff}
+[data-theme="neon"]{--bg:#0b0414;--bg2:#2a0b3d;--fg:#fdf4ff;--accent:#ff2bd6;--accent2:#22d3ee;--blob1:#ff2bd6;--blob2:#22d3ee;--blob3:#7c3aed}
+[data-theme="terminal"]{--bg:#050805;--bg2:#0b1a0b;--fg:#c9f7c9;--accent:#39ff14;--accent2:#9dff8a;--blob1:#1f7a10;--blob2:#39ff14;--blob3:#0f4d0f}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;cursor:none;background:#000;color:var(--fg);
+  font-family:ui-sans-serif,system-ui,"Segoe UI",Roboto,Inter,"Helvetica Neue",Arial,sans-serif}
+.stage{position:absolute;left:50%;top:50%;width:1280px;height:720px;transform-origin:center;overflow:hidden;
+  background:radial-gradient(900px 600px at 50% 35%,var(--bg2),var(--bg) 70%)}
+/* artistic backdrop: slow drifting colour blobs + a grain of dots */
+.blob{position:absolute;border-radius:50%;filter:blur(60px);opacity:.45;animation:drift 18s ease-in-out infinite alternate}
+.b1{width:480px;height:480px;left:-120px;top:-100px;background:var(--blob1)}
+.b2{width:420px;height:420px;right:-100px;top:120px;background:var(--blob2);animation-delay:-6s}
+.b3{width:360px;height:360px;left:340px;bottom:-200px;background:var(--blob3);animation-delay:-11s}
+@keyframes drift{to{transform:translate(70px,50px) scale(1.15)}}
+.dots{position:absolute;inset:0;background-image:radial-gradient(rgba(255,255,255,.14) 1.2px,transparent 1.4px);background-size:34px 34px;
+  mask-image:radial-gradient(circle at 50% 45%,transparent 25%,#000 80%);-webkit-mask-image:radial-gradient(circle at 50% 45%,transparent 25%,#000 80%)}
+.live{position:absolute;left:34px;top:28px;display:flex;align-items:center;gap:8px;font-weight:800;letter-spacing:.16em;font-size:15px;
+  color:#fff;background:#f43f5e;padding:6px 12px 6px 10px;border-radius:999px;z-index:3}
+.live i{width:9px;height:9px;border-radius:50%;background:#fff;animation:pulse 1.6s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.25;transform:scale(.7)}}
+#clock{position:absolute;right:36px;top:24px;font-size:28px;font-weight:650;font-variant-numeric:tabular-nums;opacity:.85;z-index:3}
+#tag{position:absolute;left:34px;top:76px;font-size:14px;letter-spacing:.14em;opacity:.65;z-index:3}
+#face{position:absolute;left:50%;top:34px;width:520px;height:538px;margin-left:-260px;animation:bob 3.4s ease-in-out infinite;z-index:2;
+  filter:drop-shadow(0 18px 30px rgba(0,0,0,.35))}
+#face.talk{animation:bob 3.4s ease-in-out infinite,hop .34s ease-in-out infinite}
+@keyframes bob{50%{transform:translateY(-10px) rotate(.6deg)}}
+@keyframes hop{50%{margin-top:-5px}}
+#face svg{width:100%;height:100%;display:block}
+/* subtitles: current word is lit, the rest of the line waits in the dark */
+#subs{position:absolute;left:90px;right:90px;bottom:34px;text-align:center;z-index:4;transition:opacity .5s;opacity:0}
+#subs.show{opacity:1}
+#who{display:inline-block;font-size:16px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:#fff;
+  background:linear-gradient(90deg,var(--accent),var(--accent2));padding:4px 14px;border-radius:999px;margin-bottom:10px}
+#line{font-size:40px;font-weight:800;line-height:1.2;letter-spacing:-.01em;-webkit-text-stroke:9px rgba(0,0,0,.75);paint-order:stroke fill;
+  text-shadow:0 6px 24px rgba(0,0,0,.45)}
+#line span{display:inline-block;margin:0 .14em;opacity:.3;transform:translateY(5px);transition:opacity .12s,transform .12s,color .12s}
+#line span.on{opacity:1;transform:none}
+#line span.now{color:var(--accent)}
+#hint{position:absolute;right:20px;bottom:14px;font-size:14px;opacity:.7;z-index:5;display:none;cursor:pointer}
+</style>
+</head>
+<body>
+<div class="stage" id="stage" data-theme="midnight">
+  <div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div><div class="dots"></div>
+  <div class="live"><i></i>LIVE</div><div id="clock"></div>
+  <div id="tag">this face is a python file</div>
+  <div id="face"></div>
+  <div id="subs"><div id="who"></div><div id="line"></div></div>
+  <div id="hint">click for sound</div>
+</div>
+<script>
+"use strict";
+const Q = new URLSearchParams(location.search);
+const $ = id => document.getElementById(id);
+const stage = $("stage");
+const MUTE = Q.has("mute"), SUBS = Q.get("subs") !== "0", BLINK = Q.get("blink") !== "0";
+const theme = Q.get("theme");
+if (["midnight", "daylight", "neon", "terminal"].includes(theme)) stage.dataset.theme = theme;
+
+/* scale the 1280x720 canvas to the real window */
+function fit() {
+  const s = Math.min(innerWidth / 1280, innerHeight / 720);
+  stage.style.transform = "translate(-50%,-50%) scale(" + s + ")";
+}
+addEventListener("resize", fit); fit();
+
+setInterval(() => { $("clock").textContent = new Date().toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"}); }, 1000);
+$("clock").textContent = new Date().toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"});
+
+let svg = null, EMO = {}, cur = null, curId = null, audio = null, t0 = 0, spans = [], lastMouth = "", lastWord = -1, hideAt = 0;
+
+async function boot() {
+  try {
+    const [svgText, emo] = await Promise.all([
+      fetch("vtuber/face.svg", {cache: "no-store"}).then(r => r.text()),
+      fetch("vtuber/emotions.json", {cache: "no-store"}).then(r => r.json()),
+    ]);
+    $("face").innerHTML = svgText;
+    svg = $("vt-face"); EMO = emo;
+  } catch (e) {
+    $("face").textContent = "face.svg missing: run python3 -m vtuber --build";
+    return;
+  }
+  setEmotion("neutral");
+  poll(); setInterval(poll, 400);
+  requestAnimationFrame(frame);
+  (function blink() {
+    setTimeout(() => {
+      if (BLINK && svg && EMO[svg.dataset.emo] && EMO[svg.dataset.emo].blinks) {
+        svg.dataset.blink = "1"; setTimeout(() => { svg.dataset.blink = "0"; }, 130);
+      }
+      blink();
+    }, 2200 + Math.random() * 3200);
+  })();
+}
+
+function setEmotion(name) {
+  if (!EMO[name]) name = "neutral";
+  svg.dataset.emo = name;
+}
+const rest = () => (EMO[svg.dataset.emo] || {}).rest || "flat";
+
+async function poll() {
+  let j;
+  try { j = await (await fetch("vtuber/now.json", {cache: "no-store"})).json(); } catch (e) { return; }
+  if (!j || j.id === curId) return;
+  curId = j.id;
+  // a line that already finished (page just reloaded): do not replay it
+  if (Date.now() - j.started_ms > (j.duration + 1) * 1000) return;
+  start(j);
+}
+
+function start(j) {
+  cur = j; lastWord = -1;
+  setEmotion(j.emotion);
+  $("who").textContent = j.name || "";
+  $("line").textContent = "";
+  spans = j.words.map(w => { const s = document.createElement("span"); s.textContent = w[1]; $("line").append(s); return s; });
+  $("subs").classList.toggle("show", SUBS);
+  if (audio) { audio.pause(); audio = null; }
+  t0 = performance.now();
+  if (!MUTE) {
+    audio = new Audio(j.audio);
+    audio.addEventListener("playing", () => { t0 = performance.now() - audio.currentTime * 1000; });
+    audio.play().catch(() => { $("hint").style.display = "block"; });
+  }
+}
+$("hint").addEventListener("click", () => { $("hint").style.display = "none"; if (audio) audio.play().catch(() => {}); });
+document.addEventListener("click", () => { $("hint").style.display = "none"; });
+
+function frame() {
+  requestAnimationFrame(frame);
+  if (!cur) return;
+  const t = (performance.now() - t0) / 1000;
+  const talking = t < cur.duration;
+  let mouth = rest();
+  if (talking) {
+    for (const c of cur.cues) { if (t >= c[0] && t < c[1]) { mouth = c[2] === "closed" ? rest() : c[2]; break; } }
+  }
+  if (mouth !== lastMouth) { svg.dataset.mouth = mouth; lastMouth = mouth; }
+  svg.classList.toggle("speaking", talking); $("face").classList.toggle("talk", talking && mouth !== rest());
+  let w = -1;
+  for (let i = 0; i < cur.words.length; i++) if (t >= cur.words[i][0]) w = i;
+  if (w !== lastWord) {
+    spans.forEach((s, i) => { s.classList.toggle("on", i <= w); s.classList.toggle("now", i === w && talking); });
+    lastWord = w;
+  }
+  if (!talking) {
+    if (!hideAt) hideAt = performance.now() + 1400;
+    if (performance.now() > hideAt) {
+      $("subs").classList.remove("show"); setEmotion("neutral"); svg.dataset.mouth = rest();
+      svg.classList.remove("speaking"); $("face").classList.remove("talk");
+      cur = null; hideAt = 0; lastMouth = "";
+    }
+  } else { hideAt = 0; }
+}
+boot();
+</script>
+</body>
+</html>

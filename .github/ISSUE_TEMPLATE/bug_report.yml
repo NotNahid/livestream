@@ -1,0 +1,22 @@
+name: Bug report
+description: Something is broken
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you expect instead?
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Platform and OS
+      placeholder: Twitch, Ubuntu 24.04 / Cloud Shell / Docker
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Output of ./doctor.sh and the tail of logs/*.log. REMOVE YOUR STREAM KEY.
+      render: shell

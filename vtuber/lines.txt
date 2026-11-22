@@ -1,0 +1,14 @@
+# emotion | what she says. Emotions: neutral happy surprised sad angry smug sleepy panic
+# Sound effects: [laugh] [gasp] [boing] [ahem] [sigh]  (or your own: assets/sounds/<name>.wav -> [<name>])
+happy | Hello hello! Welcome to the stream. [boing]
+smug | Fun fact: my entire face is a Python file. You are watching code with hair.
+neutral | I do not have a body. I have a for loop and a dream.
+surprised | Wait, are you real? Are you watching right now?!
+panic | Oh no, I forgot what I was going to say! [gasp]
+sad | Nobody told me the server only costs five dollars. I thought I was expensive.
+angry | Who put a semicolon in my Python?! Fix it right now!
+sleepy | It is very late, and I am only a few thousand lines of code. [sigh]
+happy | But I am happy! Thank you for watching. [laugh]
+smug | Do not tell anyone, but my voice is just letters turned into beeps. [ahem]
+neutral | Please remember to drink some water. I cannot. I have no mouth, only cues.
+happy | See you in the next loop!

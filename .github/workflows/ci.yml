@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    name: Lint + tests (Python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.9", "3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install dev tools
+        run: pip install -r requirements-dev.txt
+      - name: Ruff
+        run: ruff check .
+      - name: Unit tests
+        run: python -m unittest discover -s tests -v
+
+  shell:
+    name: Shell scripts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax check
+        run: for f in *.sh scripts/*.sh; do bash -n "$f"; done
+      - name: ShellCheck
+        run: shellcheck --severity=warning *.sh scripts/*.sh
+
+  config:
+    name: JSON + YAML validity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate config files
+        run: |
+          python3 -m json.tool config.example.json > /dev/null
+          python3 -m json.tool web/demo.json > /dev/null
+      - name: Lint YAML
+        run: |
+          pip install yamllint
+          yamllint -d "{extends: relaxed, rules: {line-length: disable, truthy: disable}}" .github docker-compose.yml
+
+  e2e:
+    name: Overlay smoke test (headless Chromium)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt && python -m playwright install --with-deps chromium
+      - name: Render overlay and check it drew content
+        run: python scripts/smoke_test.py
+      - name: Render the VTuber page and check mouth + subtitles move
+        run: python scripts/vtuber_preview.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: overlay-screenshots
+          path: |
+            logs/*.png
+            output/*.png
+          if-no-files-found: ignore
+
+  docker:
+    name: Docker build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

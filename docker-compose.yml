@@ -1,0 +1,15 @@
+services:
+  stream:
+    build: .
+    image: livestream-proto
+    env_file: .env            # STREAM_KEY, PLATFORM, ADMIN_TOKEN, ...
+    environment:
+      BIND: "0.0.0.0"
+      MINUTES: "${MINUTES:-0}"   # 0 = run until stopped
+    ports:
+      - "127.0.0.1:8080:8080"    # control panel only on this machine; put a reverse proxy in front to expose it
+    volumes:
+      - ./config.json:/app/config.json:ro   # create it first: cp config.example.json config.json
+      - ./logs:/app/logs
+    shm_size: "1gb"              # Chromium needs more than Docker's 64 MB default
+    restart: unless-stopped

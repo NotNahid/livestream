@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Stream control</title>
+<style>
+:root{--bg:#0a0e1a;--card:#111a31;--line:#1f2a47;--fg:#eef2fb;--muted:#8d98b5;--accent:#4ade80;--down:#f87171;--warn:#fbbf24}
+@media (prefers-color-scheme: light){:root{--bg:#f5f7fb;--card:#fff;--line:#d4dbea;--fg:#0f172a;--muted:#5b6785;--accent:#16a34a;--down:#dc2626;--warn:#b45309}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.45 ui-sans-serif,system-ui,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:760px;margin:0 auto;padding:20px 16px 60px}
+h1{font-size:22px;margin:0 0 4px}.sub{color:var(--muted);margin:0 0 20px}
+section{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px}
+h2{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:0 0 12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+.stat{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.stat b{display:block;font-size:22px;font-variant-numeric:tabular-nums}.stat span{font-size:12px;color:var(--muted)}
+.ok{color:var(--accent)}.bad{color:var(--down)}.warn{color:var(--warn)}
+input,select,button{font:inherit;border-radius:10px;border:1px solid var(--line);padding:10px 12px;background:var(--bg);color:var(--fg);min-height:44px}
+input[type=text],input[type=password],input[type=number]{width:100%}
+button{cursor:pointer;background:var(--accent);color:#04210f;font-weight:700;border-color:transparent}
+button.ghost{background:var(--bg);color:var(--fg);border-color:var(--line);font-weight:600}
+button.on{outline:2px solid var(--accent)}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.row>*{flex:1}.row>button{flex:none}
+.scenes{display:flex;gap:8px;flex-wrap:wrap}.scenes button{flex:none}
+#msg{min-height:1.4em;margin-top:8px;font-size:14px}
+label.t{display:flex;gap:8px;align-items:center;color:var(--muted);font-size:14px;margin-top:10px}
+label.t input{min-height:0;width:auto}
+a{color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Stream control</h1>
+  <p class="sub">Change what's on air without restarting. <a href="index.html" target="_blank" rel="noopener">Open overlay</a></p>
+
+  <section aria-labelledby="h-status">
+    <h2 id="h-status">Status</h2>
+    <div class="grid" id="stats"></div>
+  </section>
+
+  <section aria-labelledby="h-token">
+    <h2 id="h-token">Admin token</h2>
+    <input type="password" id="token" placeholder="Only needed if ADMIN_TOKEN is set" autocomplete="off">
+    <label class="t"><input type="checkbox" id="remember"> Remember for this browser tab</label>
+  </section>
+
+  <section aria-labelledby="h-banner">
+    <h2 id="h-banner">Banner message</h2>
+    <input type="text" id="banner" maxlength="200" placeholder="e.g. Giveaway in 10 minutes!">
+    <div class="row" style="margin-top:10px">
+      <select id="secs" aria-label="Show for">
+        <option value="10">Show 10 s</option><option value="20" selected>Show 20 s</option>
+        <option value="60">Show 1 min</option><option value="300">Show 5 min</option>
+      </select>
+      <button id="send">Show banner</button><button class="ghost" id="clear">Hide</button>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-scene">
+    <h2 id="h-scene">Scene</h2>
+    <div class="scenes" id="scenes"></div>
+    <label class="t"><input type="checkbox" id="paused"> Pause auto-rotation</label>
+  </section>
+
+  <section aria-labelledby="h-theme">
+    <h2 id="h-theme">Theme</h2>
+    <div class="scenes" id="themes"></div>
+  </section>
+  <div id="msg" role="status" aria-live="polite"></div>
+</div>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const THEMES = ["midnight", "daylight", "neon", "terminal"];
+let state = {}, panels = [];
+try { $("token").value = sessionStorage.getItem("tok") || ""; $("remember").checked = !!$("token").value; } catch (e) {}
+
+function say(text, bad){ const m = $("msg"); m.textContent = text; m.className = bad ? "bad" : "ok"; }
+
+async function post(patch){
+  const headers = {"Content-Type": "application/json"};
+  if ($("token").value) headers["X-Admin-Token"] = $("token").value;
+  try { if ($("remember").checked) sessionStorage.setItem("tok", $("token").value); else sessionStorage.removeItem("tok"); } catch (e) {}
+  const r = await fetch("api/state", {method: "POST", headers, body: JSON.stringify(patch)});
+  const j = await r.json();
+  if (!r.ok) return say(j.error || "Request failed", true);
+  state = j; say("Done ✓"); draw();
+}
+
+function stat(label, value, cls){
+  const d = document.createElement("div"); d.className = "stat";
+  const b = document.createElement("b"); b.textContent = value; if (cls) b.className = cls;
+  const s = document.createElement("span"); s.textContent = label;
+  d.append(b, s); return d;
+}
+function mmss(s){ s = Math.floor(s); const h = Math.floor(s/3600), m = Math.floor(s%3600/60); return h ? `${h}h ${m}m` : `${m}m ${s%60}s`; }
+
+async function refresh(){
+  try {
+    const st = await (await fetch("api/status", {cache: "no-store"})).json();
+    state = st.state;
+    const f = st.ffmpeg || {};
+    const box = $("stats"); box.replaceChildren(
+      stat("Stream", f.running ? "ON AIR" : "OFFLINE", f.running ? "ok" : "bad"),
+      stat("FPS", f.fps != null ? f.fps.toFixed(0) : "–"),
+      stat("Bitrate", f.bitrate_kbps != null ? Math.round(f.bitrate_kbps) + " kb/s" : "–"),
+      stat("Speed", f.speed != null ? f.speed.toFixed(2) + "×" : "–", f.speed && f.speed < 0.97 ? "warn" : ""),
+      stat("Data age", st.data_age_s != null ? mmss(st.data_age_s) : "–", st.data_age_s > 300 ? "warn" : ""),
+      stat("Panels", String(st.panels)));
+    const d = await (await fetch("data.json?" + Date.now(), {cache: "no-store"})).json();
+    panels = d.panels || [];
+    draw();
+  } catch (e) { say("Can't reach the server", true); }
+}
+
+function btn(label, active, fn){
+  const b = document.createElement("button"); b.className = "ghost" + (active ? " on" : ""); b.textContent = label;
+  b.onclick = fn; return b;
+}
+function draw(){
+  $("scenes").replaceChildren(btn("Auto-rotate", !state.scene, () => post({scene: ""})),
+    ...panels.map(p => btn(p.title || p.id, state.scene === p.id, () => post({scene: p.id}))));
+  $("themes").replaceChildren(btn("Default", !state.theme, () => post({theme: ""})),
+    ...THEMES.map(t => btn(t, state.theme === t, () => post({theme: t}))));
+  $("paused").checked = !!state.paused;
+}
+
+$("send").onclick = () => post({message: $("banner").value, message_seconds: Number($("secs").value)});
+$("clear").onclick = () => { $("banner").value = ""; post({message: ""}); };
+$("paused").onchange = e => post({paused: e.target.checked});
+$("banner").addEventListener("keydown", e => { if (e.key === "Enter") $("send").click(); });
+refresh(); setInterval(refresh, 4000);
+</script>
+</body>
+</html>

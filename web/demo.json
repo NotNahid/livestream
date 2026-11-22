@@ -1,0 +1,33 @@
+{
+  "title": "Livestream Proto · Demo",
+  "theme": "midnight",
+  "rotate_seconds": 8,
+  "ticker": true,
+  "updated": "12:00:00",
+  "panels": [
+    {"id": "p0", "type": "hackernews", "kind": "list", "title": "Hacker News", "stale": false, "items": [
+      {"title": "Show HN: I streamed a dashboard 24/7 from a $5 VPS with no GPU", "meta": "412 pts · 138 comments"},
+      {"title": "Why SQLite is the only database most apps need", "meta": "377 pts · 201 comments"},
+      {"title": "FFmpeg 8.0 released with new hardware encoders", "meta": "298 pts · 64 comments"},
+      {"title": "A gentle introduction to WebAssembly components", "meta": "231 pts · 47 comments"},
+      {"title": "Postmortem: the day our cron job ate the disk", "meta": "190 pts · 88 comments"},
+      {"title": "The case for boring technology, five years on", "meta": "174 pts · 120 comments"},
+      {"title": "Linux 7.0: what's new for desktop users", "meta": "160 pts · 73 comments"},
+      {"title": "Ask HN: What are you self-hosting in 2026?", "meta": "152 pts · 340 comments"}
+    ]},
+    {"id": "p1", "type": "crypto", "kind": "stats", "title": "Markets", "stale": false, "items": [
+      {"title": "BITCOIN", "meta": "98,420 USD", "delta": 2.41},
+      {"title": "ETHEREUM", "meta": "3,812.55 USD", "delta": -1.07},
+      {"title": "SOLANA", "meta": "214.30 USD", "delta": 5.92}
+    ]},
+    {"id": "p2", "type": "weather", "kind": "stats", "title": "Weather", "stale": false, "items": [
+      {"title": "Dhaka", "meta": "29°C · Partly cloudy · 11 km/h"},
+      {"title": "London", "meta": "9°C · Light rain · 18 km/h"},
+      {"title": "New York", "meta": "14°C · Clear · 9 km/h"}
+    ]},
+    {"id": "p3", "type": "text", "kind": "text", "title": "Welcome", "stale": false, "items": [
+      {"title": "Thanks for watching!", "meta": ""},
+      {"title": "This stream runs headless: Xvfb + Chromium + FFmpeg", "meta": ""}
+    ]}
+  ]
+}

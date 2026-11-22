@@ -1,0 +1,22 @@
+{
+  "title": "Live Dashboard",
+  "theme": "midnight",
+  "rotate_seconds": 15,
+  "refresh_seconds": 60,
+  "ticker": true,
+  "vtuber": { "name": "Pyon", "pitch": 150, "gap_seconds": 1.4 },
+  "sources": [
+    { "type": "hackernews", "title": "Hacker News", "limit": 8 },
+    { "type": "github", "title": "New on GitHub", "days": 7, "limit": 8 },
+    { "type": "crypto", "title": "Markets", "coins": ["bitcoin", "ethereum", "solana"], "currency": "usd" },
+    { "type": "weather", "title": "Weather", "places": [
+        { "name": "Dhaka", "lat": 23.81, "lon": 90.41 },
+        { "name": "London", "lat": 51.51, "lon": -0.13 },
+        { "name": "New York", "lat": 40.71, "lon": -74.01 }
+    ] },
+    { "type": "text", "title": "Welcome", "lines": [
+        "Thanks for watching!",
+        "This stream runs headless: Xvfb + Chromium + FFmpeg"
+    ] }
+  ]
+}

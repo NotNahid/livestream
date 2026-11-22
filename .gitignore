@@ -1,0 +1,15 @@
+.env
+config.json
+.venv/
+__pycache__/
+*.pyc
+web/data.json
+web/data.tmp
+logs/
+site/
+*.mkv
+.ruff_cache/
+.DS_Store
+web/vtuber/audio/
+web/vtuber/now.json
+web/vtuber/now.tmp
