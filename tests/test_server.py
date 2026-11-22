@@ -27,6 +27,35 @@ class StateValidation(unittest.TestCase):
         self.assertEqual(server.sanitize_state({"message": ""})["message_until"], 0)
 
 
+class SourceNormalising(unittest.TestCase):
+    def test_youtube_links_become_player_urls(self):
+        for raw in ("https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+                    "https://youtu.be/dQw4w9WgXcQ?t=5",
+                    "https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1",
+                    "https://www.youtube.com/shorts/dQw4w9WgXcQ",
+                    "dQw4w9WgXcQ"):
+            self.assertEqual(server.normalize_source(raw), "player.html?v=dQw4w9WgXcQ", raw)
+
+    def test_aliases_and_default(self):
+        self.assertEqual(server.normalize_source(""), "")
+        self.assertEqual(server.normalize_source(" Dashboard "), "index.html")
+        self.assertEqual(server.normalize_source("vtuber"), "vtuber.html")
+
+    def test_plain_web_address_is_kept(self):
+        self.assertEqual(server.normalize_source("https://example.com/live?x=1"), "https://example.com/live?x=1")
+
+    def test_rejects_unsafe_or_unusable(self):
+        for bad in ("javascript:alert(1)", "file:///etc/passwd", "ftp://x.y/z", "not a link",
+                    "https://example.com/a b", "https://www.youtube.com/playlist?list=PLabc",
+                    "https://example.com/" + "a" * 500):
+            with self.assertRaises(ValueError, msg=bad):
+                server.normalize_source(bad)
+
+    def test_sanitize_state_accepts_source(self):
+        self.assertEqual(server.sanitize_state({"source": "https://youtu.be/dQw4w9WgXcQ"})["source"],
+                         "player.html?v=dQw4w9WgXcQ")
+
+
 class HttpTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -65,6 +94,16 @@ class HttpTests(unittest.TestCase):
         self.assertEqual(json.loads(self.req("/api/state")[1])["message"], "hello")
         self.assertEqual(self.req("/api/state", {"theme": "bad"})[0], 400)
         self.req("/api/state", {"message": "", "theme": ""})
+
+    def test_source_switch_live_and_stage_page(self):
+        code, _ = self.req("/stage.html")
+        self.assertEqual(code, 200)
+        code, body = self.req("/api/state", {"source": "https://youtu.be/dQw4w9WgXcQ"})
+        self.assertEqual(code, 200)
+        self.assertEqual(json.loads(self.req("/api/state")[1])["source"], "player.html?v=dQw4w9WgXcQ")
+        self.assertEqual(self.req("/api/state", {"source": "javascript:alert(1)"})[0], 400)
+        self.assertEqual(json.loads(self.req("/api/state")[1])["source"], "player.html?v=dQw4w9WgXcQ")  # unchanged
+        self.req("/api/state", {"source": ""})
 
     def test_token_required_when_set(self):
         with mock.patch.dict("os.environ", {"ADMIN_TOKEN": "s3cret"}):

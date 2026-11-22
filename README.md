@@ -43,13 +43,15 @@ cp config.example.json config.json   # optional: choose data sources and theme
 
 Open `http://127.0.0.1:8080/control.html` while running to steer the stream. On a remote machine use an SSH tunnel: `ssh -L 8080:127.0.0.1:8080 you@server`.
 
+**Change the video while live:** in the control panel, paste a YouTube link or web page address under **Video source** and press *Play on stream*. It switches within about a second and the stream does not restart. (`PAGE_URL` in `.env` only sets the starting source; editing `.env` mid-stream has no effect.) YouTube links always work; some other sites forbid being shown inside another page and will stay black.
+
 ## How it works
 
 ```
 vtuber/     -> optional VTuber: face.py (SVG), voice.py (babble audio), __main__.py (director)
 agent.py    -> fetches data from your sources, writes web/data.json
 server.py   -> serves web/ and the control API (/api/state, /api/status)
-web/        -> index.html (the streamed overlay), control.html, player.html
+web/        -> stage.html (what the browser keeps open; swaps the source live), index.html (the overlay), control.html, player.html
 browser.py  -> opens the overlay in kiosk Chromium on the virtual screen
 run.sh      -> starts everything, runs FFmpeg to the RTMP server, reconnects on failure
 ```
@@ -70,7 +72,7 @@ run.sh      -> starts everything, runs FFmpeg to the RTMP server, reconnects on 
 | `X264_PRESET` | `veryfast` | Slower = better quality, more CPU |
 | `SILENT_AUDIO` | `0` | `1` = never use PulseAudio |
 | `PORT` / `BIND` / `ADMIN_TOKEN` | `8080` / `127.0.0.1` / unset | Control panel. `BIND=0.0.0.0` **requires** `ADMIN_TOKEN` |
-| `PAGE_URL` | built-in overlay | Stream any page or YouTube video you own |
+| `PAGE_URL` | built-in overlay | What the stream **starts** with: a YouTube link or any web page. Change it live (no restart) in the control panel, see below |
 | `GITHUB_TOKEN` | unset | Optional, raises GitHub API limits |
 
 ### `config.json` (what is shown)
@@ -114,7 +116,7 @@ curl -X POST http://127.0.0.1:8080/api/state -H 'Content-Type: application/json'
      -H "X-Admin-Token: $ADMIN_TOKEN" -d '{"message":"Giveaway in 5 minutes!","message_seconds":60}'
 ```
 
-Fields: `message`, `message_seconds`, `scene` (`p0`, `p1`... or `""` for auto), `paused`, `theme`. `GET /api/status` returns stream fps, bitrate and data age.
+Fields: `message`, `message_seconds`, `scene` (`p0`, `p1`... or `""` for auto), `paused`, `theme`, `source` (a YouTube link or ID, an `https://` address, `dashboard`, `vtuber`, or `""` for the default). `GET /api/status` returns stream fps, bitrate and data age.
 
 ## VTuber mode
 
@@ -168,7 +170,9 @@ Never commit `.env`; it is already in `.gitignore`. If a key leaks, reset it on 
 | Black screen / no browser | `tail logs/browser.log`; re-run `./setup.sh` (Cloud Shell wipes apt packages on reset) |
 | Stream key rejected | Check `PLATFORM`/`RTMP_URL`; reset the key on the platform |
 | `speed` below `1.0x` in the control panel | CPU too slow: lower `RESOLUTION`/`FPS` or use `X264_PRESET=ultrafast` |
-| YouTube video shows Error 153 | Use `PAGE_URL` with a normal link; it is wrapped by `player.html` automatically |
+| YouTube video shows Error 153 | Use a normal YouTube link (in `PAGE_URL` or the control panel); it is wrapped by `player.html` automatically |
+| Want to change the video mid-stream | Control panel (`/control.html`) -> **Video source**. No restart needed |
+| A website stays black in **Video source** | That site blocks being embedded in another page; use YouTube or a page that allows embedding |
 | Silent stream | `sudo apt-get install pulseaudio`, unset `SILENT_AUDIO` |
 | Terminal frozen | `./stop.sh` |
 | A source shows old data | See `logs/agent.log`; the last good data is kept and "OFFLINE DATA" appears if everything is stale |

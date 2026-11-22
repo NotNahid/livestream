@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<title>Stage</title>
+<style>
+html,body{margin:0;width:100%;height:100%;background:#000;overflow:hidden;cursor:none}
+iframe{border:0;width:100%;height:100%;display:block;background:#000}
+</style></head>
+<body>
+<!-- This is the page the stream browser keeps open. It shows whatever "source" the control panel
+     (or PAGE_URL in .env at startup) picked, and swaps it within a second when that changes,
+     so the stream never restarts. Open /control.html to change it. -->
+<iframe id="f" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen
+        referrerpolicy="strict-origin-when-cross-origin"></iframe>
+<script>
+"use strict";
+const f = document.getElementById("f");
+let current = null;
+async function tick(){
+  try {
+    const s = await (await fetch("api/state", {cache: "no-store"})).json();
+    const want = s.source || "index.html";
+    if (want !== current) { current = want; f.src = want; }
+  } catch (e) { /* server busy: keep showing the current page */ }
+}
+tick(); setInterval(tick, 1000);
+</script>
+</body></html>

@@ -58,12 +58,13 @@ if [ -f logs/run.pid ] && kill -0 "$(cat logs/run.pid)" 2>/dev/null; then
 fi
 echo $$ > logs/run.pid
 
-VT_PAGE="index.html"; [ "${VTUBER:-0}" = "1" ] && VT_PAGE="vtuber.html"   # VTUBER=1 streams the VTuber stage
-export PAGE_URL="${PAGE_URL:-http://127.0.0.1:$PORT/$VT_PAGE}"
-# YouTube links are played through our own wrapper page (direct embeds give Error 153)
-if [[ "$PAGE_URL" =~ (youtube\.com|youtu\.be) ]] && [[ "$PAGE_URL" =~ (v=|youtu\.be/|embed/|shorts/)([A-Za-z0-9_-]{11}) ]]; then
-  export PAGE_URL="http://127.0.0.1:$PORT/player.html?v=${BASH_REMATCH[2]}"
-fi
+# What to show FIRST. PAGE_URL in .env only sets the starting source: the browser always opens
+# stage.html, which follows the source chosen live in the control panel (no restart needed).
+# server.py turns a YouTube link into the player.html wrapper (direct embeds give Error 153).
+START_SOURCE="${PAGE_URL:-}"
+[ -z "$START_SOURCE" ] && [ "${VTUBER:-0}" = "1" ] && START_SOURCE="vtuber"   # VTUBER=1 starts on the VTuber stage
+export START_SOURCE
+export PAGE_URL="http://127.0.0.1:$PORT/stage.html"
 PY=python3; [ -x .venv/bin/python ] && PY=.venv/bin/python
 DNUM="${DISPLAY_NUM:-99}"
 PIDS=()
@@ -140,6 +141,7 @@ for _ in 1 2 3 4 5 6 7 8 9 10; do
 done
 curl -fs "http://127.0.0.1:$PORT/api/health" >/dev/null 2>&1 || { echo "ERROR: web server did not start:"; tail -10 logs/http.log; exit 1; }
 echo "Server: http://127.0.0.1:$PORT  (control panel: /control.html)"
+echo "Tip: change the video/page live (no restart) in the control panel -> \"Video source\". PAGE_URL in .env is only the starting source."
 sleep 2
 
 # 4. browser, restarted automatically if it crashes

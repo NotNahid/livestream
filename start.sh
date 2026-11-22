@@ -27,7 +27,8 @@ if [ ! -f .env ] || grep -q 'your_stream_key_here' .env; then
   case "$K$U" in *\'*|*\ *) echo "Key/URL must not contain spaces or quotes."; exit 1 ;; esac
   read -r -p "Minutes to stream, 0 = until stopped [10]: " M
   [[ "${M:-10}" =~ ^[0-9]+$ ]] || { echo "Minutes must be a number."; exit 1; }
-  read -r -p "YouTube video link to play instead of the dashboard (Enter to skip): " V
+  echo "(You can change the video later while live: open http://127.0.0.1:8080/control.html -> Video source.)"
+  read -r -p "YouTube video link to start with instead of the dashboard (Enter to skip): " V
   umask 077
   {
     echo "PLATFORM=$PLAT"

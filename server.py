@@ -2,7 +2,7 @@
 """Tiny web server: serves web/ and a small control API (standard library only).
 
     GET  /api/health   -> {"ok": true}
-    GET  /api/state    -> live overrides (banner message, pinned scene, pause, theme)
+    GET  /api/state    -> live overrides (banner message, pinned scene, pause, theme, video source)
     POST /api/state    -> change them (JSON body; needs the admin token, see below)
     GET  /api/status   -> stream health: uptime, ffmpeg fps/bitrate, data age
 
@@ -32,7 +32,37 @@ MAX_BODY = 8 * 1024
 STARTED = time.time()
 
 _lock = threading.Lock()
-STATE: dict = {"message": "", "message_until": 0, "scene": "", "paused": False, "theme": "", "rev": 0}
+STATE: dict = {"message": "", "message_until": 0, "scene": "", "paused": False, "theme": "", "source": "", "rev": 0}
+
+YT_ID_RE = re.compile(r"(?:v=|youtu\.be/|embed/|shorts/|live/)([A-Za-z0-9_-]{11})(?![A-Za-z0-9_-])")
+YT_BARE_RE = re.compile(r"[A-Za-z0-9_-]{11}")
+SOURCE_ALIASES = {"": "", "default": "", "dashboard": "index.html", "overlay": "index.html", "vtuber": "vtuber.html"}
+
+
+def normalize_source(raw: str) -> str:
+    """Turn what a person typed into something stage.html can show.
+
+    ""                    -> "" (the default page)
+    dashboard / vtuber    -> the built-in pages
+    YouTube link or ID    -> player.html?v=ID (YouTube refuses direct embeds, so we wrap it)
+    http(s) address       -> unchanged
+    Anything else raises ValueError.
+    """
+    raw = (raw or "").strip()
+    if raw.lower() in SOURCE_ALIASES:
+        return SOURCE_ALIASES[raw.lower()]
+    if len(raw) > 500 or re.search(r"\s", raw):
+        raise ValueError("source must be one link without spaces (max 500 chars)")
+    if re.search(r"(youtube\.com|youtu\.be)", raw, re.I):
+        m = YT_ID_RE.search(raw)
+        if not m:
+            raise ValueError("could not find a YouTube video id in that link (playlists and channels are not supported)")
+        return f"player.html?v={m.group(1)}"
+    if YT_BARE_RE.fullmatch(raw):
+        return f"player.html?v={raw}"
+    if re.match(r"https?://[^/\s]+", raw, re.I):
+        return raw
+    raise ValueError("source must be a YouTube link or an http(s):// address (or 'dashboard' / 'vtuber')")
 
 
 def sanitize_state(patch: dict) -> dict:
@@ -57,6 +87,8 @@ def sanitize_state(patch: dict) -> dict:
         if theme and theme not in THEMES:
             raise ValueError(f"theme must be one of {THEMES}")
         out["theme"] = theme
+    if "source" in patch:
+        out["source"] = normalize_source(str(patch["source"]))
     return out
 
 
@@ -182,6 +214,11 @@ def make_server(host: str, port: int) -> ThreadingHTTPServer:
 def main() -> int:
     host = os.environ.get("BIND", "127.0.0.1")
     port = int(os.environ.get("PORT", "8080"))
+    start = os.environ.get("START_SOURCE", "")   # set by run.sh from PAGE_URL / VTUBER
+    try:
+        STATE["source"] = normalize_source(start)
+    except ValueError as e:
+        print(f"WARNING: ignoring PAGE_URL ({e}); starting with the dashboard", flush=True)
     srv = make_server(host, port)
     print(f"serving {WEB} on http://{host}:{port}  (control panel: /control.html)", flush=True)
     try:

@@ -29,6 +29,9 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 label.t{display:flex;gap:8px;align-items:center;color:var(--muted);font-size:14px;margin-top:10px}
 label.t input{min-height:0;width:auto}
 a{color:var(--accent)}
+.hint{color:var(--muted);font-size:14px;margin:0 0 10px}.hint:last-child{margin:10px 0 0}
+code{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:1px 5px;font-size:13px}
+#nowsrc{word-break:break-all}
 </style>
 </head>
 <body>
@@ -45,6 +48,22 @@ a{color:var(--accent)}
     <h2 id="h-token">Admin token</h2>
     <input type="password" id="token" placeholder="Only needed if ADMIN_TOKEN is set" autocomplete="off">
     <label class="t"><input type="checkbox" id="remember"> Remember for this browser tab</label>
+  </section>
+
+  <section aria-labelledby="h-source">
+    <h2 id="h-source">Video source</h2>
+    <p class="hint">Now showing: <b id="nowsrc">–</b></p>
+    <input type="text" id="srcurl" placeholder="Paste a YouTube link or a web page address" autocomplete="off" spellcheck="false">
+    <div class="row" style="margin-top:10px">
+      <button id="srcgo">Play on stream</button>
+    </div>
+    <div class="scenes" style="margin-top:10px">
+      <button class="ghost" id="src-dash">Dashboard</button>
+      <button class="ghost" id="src-vtuber">VTuber</button>
+    </div>
+    <p class="hint">Changes go on air within about a second, with no restart. YouTube links always work.
+      Some other websites refuse to be shown inside another page, so they may stay black; try a different address.
+      <code>PAGE_URL</code> in <code>.env</code> only sets what the stream starts with.</p>
   </section>
 
   <section aria-labelledby="h-banner">
@@ -127,9 +146,25 @@ function draw(){
   $("themes").replaceChildren(btn("Default", !state.theme, () => post({theme: ""})),
     ...THEMES.map(t => btn(t, state.theme === t, () => post({theme: t}))));
   $("paused").checked = !!state.paused;
+  $("nowsrc").textContent = describeSource(state.source);
 }
 
-$("send").onclick = () => post({message: $("banner").value, message_seconds: Number($("secs").value)});
+function describeSource(src){
+  if (!src || src === "index.html") return "Dashboard";
+  if (src === "vtuber.html") return "VTuber";
+  const m = /^player\.html\?v=([A-Za-z0-9_-]{11})$/.exec(src);
+  return m ? "YouTube video (" + m[1] + ")" : src;
+}
+
+$("srcgo").onclick = () => {
+  const v = $("srcurl").value.trim();
+  if (!v) return say("Paste a YouTube link or web address first", true);
+  post({source: v});
+};
+$("srcurl").addEventListener("keydown", e => { if (e.key === "Enter") $("srcgo").click(); });
+$("src-dash").onclick = () => post({source: "dashboard"});
+$("src-vtuber").onclick = () => post({source: "vtuber"});
+$("send").onclick =() => post({message: $("banner").value, message_seconds: Number($("secs").value)});
 $("clear").onclick = () => { $("banner").value = ""; post({message: ""}); };
 $("paused").onchange = e => post({paused: e.target.checked});
 $("banner").addEventListener("keydown", e => { if (e.key === "Enter") $("send").click(); });
